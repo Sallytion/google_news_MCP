@@ -274,20 +274,20 @@ async def root_handler(request):
         ]
     })
 
-# Configure MCP to handle root path
-mcp.settings.streamable_http_path = "/"
-
 # Create lifespan context to manage MCP session manager
 @contextlib.asynccontextmanager
 async def lifespan(app: Starlette):
     async with mcp.session_manager.run():
         yield
 
-# Create Starlette app with root route and MCP mounted
+# Configure MCP to handle /mcp path
+mcp.settings.streamable_http_path = "/mcp"
+
+# Create Starlette app - mount MCP at root so it can handle /mcp directly
 app = Starlette(
     routes=[
         Route("/", root_handler),
-        Mount("/mcp", app=mcp.streamable_http_app()),
+        Mount("", app=mcp.streamable_http_app()),
     ],
     lifespan=lifespan
 )
