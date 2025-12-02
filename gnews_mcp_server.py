@@ -237,5 +237,14 @@ def get_config() -> str:
 
 # Main entry point
 if __name__ == "__main__":
+    import os
+    # Get port from environment variable (Heroku sets PORT)
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    
+    # Configure server settings
+    mcp.settings.host = host
+    mcp.settings.port = port
+    
     # Run with streamable-http transport
     mcp.run(transport="streamable-http")
