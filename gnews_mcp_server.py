@@ -261,6 +261,15 @@ async def root_handler(request):
 # Configure MCP to handle root path
 mcp.settings.streamable_http_path = "/"
 
+# Allow Heroku hostname
+import os
+heroku_app_name = os.environ.get("HEROKU_APP_NAME", "gnews-mcp-e199d066090f")
+mcp.settings.allowed_origins = [
+    "http://localhost:8000",
+    "https://localhost:8000",
+    f"https://{heroku_app_name}.herokuapp.com",
+]
+
 # Create lifespan context to manage MCP session manager
 @contextlib.asynccontextmanager
 async def lifespan(app: Starlette):
