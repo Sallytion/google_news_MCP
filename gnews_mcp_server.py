@@ -40,7 +40,7 @@ def search_news(
     country: str = "US",
     period: str = "7d",
     max_results: int = 10,
-    exclude_websites: Optional[str] = None,
+    exclude_websites: str = "",
 ) -> str:
     """
     Search for news articles by keyword.
@@ -57,7 +57,7 @@ def search_news(
         JSON string containing news articles
     """
     try:
-        exclude_list = exclude_websites.split(",") if exclude_websites else []
+        exclude_list = [x.strip() for x in exclude_websites.split(",") if x.strip()] if exclude_websites else []
         
         google_news = GNews(
             language=language,
