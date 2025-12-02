@@ -5,6 +5,9 @@ from mcp.server.session import ServerSession
 from gnews import GNews
 from typing import Optional, List
 import json
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route, Mount
 
 # Initialize FastMCP server
 mcp = FastMCP(
@@ -235,16 +238,41 @@ def get_config() -> str:
     }, indent=2)
 
 
+async def root_handler(request):
+    """Root endpoint to show server info"""
+    return JSONResponse({
+        "name": "GNews MCP Server",
+        "version": "1.0.0",
+        "status": "running",
+        "mcp_endpoint": "/mcp",
+        "description": "Model Context Protocol server for Google News",
+        "tools": [
+            "search_news",
+            "get_top_news", 
+            "get_news_by_topic",
+            "get_news_by_location",
+            "get_news_by_site",
+            "get_available_countries",
+            "get_available_languages"
+        ]
+    })
+
 # Main entry point
 if __name__ == "__main__":
     import os
+    import uvicorn
+    
     # Get port from environment variable (Heroku sets PORT)
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
     
-    # Configure server settings
-    mcp.settings.host = host
-    mcp.settings.port = port
+    # Create Starlette app with root route and MCP mounted
+    app = Starlette(
+        routes=[
+            Route("/", root_handler),
+            Mount("/mcp", app=mcp.streamable_http_app()),
+        ]
+    )
     
-    # Run with streamable-http transport
-    mcp.run(transport="streamable-http")
+    # Run with uvicorn
+    uvicorn.run(app, host=host, port=port)
