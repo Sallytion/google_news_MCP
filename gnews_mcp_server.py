@@ -257,6 +257,14 @@ async def root_handler(request):
         ]
     })
 
+# Create Starlette app with root route and MCP mounted
+app = Starlette(
+    routes=[
+        Route("/", root_handler),
+        Mount("/mcp", app=mcp.streamable_http_app()),
+    ]
+)
+
 # Main entry point
 if __name__ == "__main__":
     import os
@@ -266,13 +274,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
     
-    # Create Starlette app with root route and MCP mounted
-    app = Starlette(
-        routes=[
-            Route("/", root_handler),
-            Mount("/mcp", app=mcp.streamable_http_app()),
-        ]
-    )
-    
-    # Run with uvicorn
-    uvicorn.run(app, host=host, port=port)
+    # Run with uvicorn - use string import for production
+    uvicorn.run("gnews_mcp_server:app", host=host, port=port, log_level="info")
