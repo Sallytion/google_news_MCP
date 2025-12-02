@@ -2,19 +2,34 @@
 
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
+from mcp.server.transport_security import TransportSecuritySettings
 from gnews import GNews
 from typing import Optional, List
 import json
 import contextlib
+import os
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
 from starlette.middleware.cors import CORSMiddleware
 
+# Configure security settings to allow Heroku hostname
+security_settings = TransportSecuritySettings(
+    enable_dns_rebinding_protection=True,
+    allowed_hosts=[
+        "localhost:8000",
+        "127.0.0.1:8000",
+        "*.herokuapp.com",  # Allow all Heroku apps
+        "gnews-mcp-e199d066090f.herokuapp.com",
+        "gnews-mcp-e199d066090f.herokuapp.com:*",
+    ]
+)
+
 # Initialize FastMCP server
 mcp = FastMCP(
     "GNews Server",
     instructions="A server that provides Google News search capabilities including keyword search, top news, news by topic, location, and site.",
+    transport_security=security_settings,
 )
 
 
