@@ -257,6 +257,9 @@ async def root_handler(request):
         ]
     })
 
+# Configure MCP to handle root path
+mcp.settings.streamable_http_path = "/"
+
 # Create Starlette app with root route and MCP mounted
 app = Starlette(
     routes=[
