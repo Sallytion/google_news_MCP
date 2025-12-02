@@ -5,6 +5,7 @@ from mcp.server.session import ServerSession
 from gnews import GNews
 from typing import Optional, List
 import json
+import contextlib
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
@@ -260,12 +261,19 @@ async def root_handler(request):
 # Configure MCP to handle root path
 mcp.settings.streamable_http_path = "/"
 
+# Create lifespan context to manage MCP session manager
+@contextlib.asynccontextmanager
+async def lifespan(app: Starlette):
+    async with mcp.session_manager.run():
+        yield
+
 # Create Starlette app with root route and MCP mounted
 app = Starlette(
     routes=[
         Route("/", root_handler),
         Mount("/mcp", app=mcp.streamable_http_app()),
-    ]
+    ],
+    lifespan=lifespan
 )
 
 # Main entry point
