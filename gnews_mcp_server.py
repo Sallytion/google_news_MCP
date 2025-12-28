@@ -1,8 +1,8 @@
 """GNews MCP Server - Provides Google News search capabilities via Model Context Protocol"""
 
-from mcp.server.fastmcp import FastMCP, Context
+from mcp. server. fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server. transport_security import TransportSecuritySettings
 from gnews import GNews
 from typing import Optional, List
 import json
@@ -11,15 +11,15 @@ import os
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
-from starlette.middleware.cors import CORSMiddleware
+from starlette. middleware.cors import CORSMiddleware
 
 # Configure security settings to allow Heroku hostname
 security_settings = TransportSecuritySettings(
     enable_dns_rebinding_protection=False,
     allowed_hosts=[
-        "localhost:8000",
+        "localhost: 8000",
         "127.0.0.1:8000",
-        "*.herokuapp.com",
+        "*. herokuapp.com",
     ]
 )
 
@@ -46,9 +46,9 @@ def search_news(
     Args:
         keyword: Search keyword for news
         language: Language code (e.g., 'en', 'es', 'fr')
-        country: Country code (e.g., 'US', 'GB', 'IN')
+        country: Country code (e. g., 'US', 'GB', 'IN')
         period: Time period (e.g., '7d', '12h', '1m', '1y')
-        max_results: Maximum number of results (1-100)
+        max_results:  Maximum number of results (1-100)
         exclude_websites: Comma-separated list of websites to exclude (e.g., 'yahoo.com,cnn.com')
     
     Returns:
@@ -81,14 +81,14 @@ def get_top_news(
     Get top news headlines.
     
     Args:
-        language: Language code (e.g., 'en', 'es', 'fr')
+        language: Language code (e. g., 'en', 'es', 'fr')
         country: Country code (e.g., 'US', 'GB', 'IN')
         max_results: Maximum number of results (1-100)
     
     Returns:
         JSON string containing top news articles
     """
-    try:
+    try: 
         google_news = GNews(
             language=language,
             country=country,
@@ -98,7 +98,7 @@ def get_top_news(
         news = google_news.get_top_news()
         return json.dumps({"status": "success", "type": "top_news", "results": news}, indent=2)
     except Exception as e:
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return json.dumps({"status":  "error", "message": str(e)}, indent=2)
 
 
 @mcp.tool()
@@ -114,23 +114,23 @@ def get_news_by_topic(
     Args:
         topic: Topic name (e.g., 'WORLD', 'BUSINESS', 'TECHNOLOGY', 'ENTERTAINMENT', 'SPORTS', 'SCIENCE', 'HEALTH', 'POLITICS')
         language: Language code (e.g., 'en', 'es', 'fr')
-        country: Country code (e.g., 'US', 'GB', 'IN')
+        country: Country code (e. g., 'US', 'GB', 'IN')
         max_results: Maximum number of results (1-100)
     
     Returns:
         JSON string containing news articles for the topic
     """
-    try:
+    try: 
         google_news = GNews(
             language=language,
             country=country,
             max_results=max_results,
         )
         
-        news = google_news.get_news_by_topic(topic.upper())
+        news = google_news.get_news_by_topic(topic. upper())
         return json.dumps({"status": "success", "topic": topic, "results": news}, indent=2)
     except Exception as e:
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return json. dumps({"status": "error", "message": str(e)}, indent=2)
 
 
 @mcp.tool()
@@ -157,7 +157,7 @@ def get_news_by_location(
         )
         
         news = google_news.get_news_by_location(location)
-        return json.dumps({"status": "success", "location": location, "results": news}, indent=2)
+        return json.dumps({"status": "success", "location":  location, "results": news}, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
 
@@ -181,7 +181,7 @@ def get_news_by_site(
     Returns:
         JSON string containing news articles from the site
     """
-    try:
+    try: 
         google_news = GNews(
             language=language,
             country=country,
@@ -190,7 +190,7 @@ def get_news_by_site(
         
         news = google_news.get_news_by_site(site)
         return json.dumps({"status": "success", "site": site, "results": news}, indent=2)
-    except Exception as e:
+    except Exception as e: 
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
 
 
@@ -206,7 +206,7 @@ def get_available_countries() -> str:
         google_news = GNews()
         return json.dumps({
             "status": "success",
-            "countries": google_news.AVAILABLE_COUNTRIES
+            "countries": google_news. AVAILABLE_COUNTRIES
         }, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
@@ -220,7 +220,7 @@ def get_available_languages() -> str:
     Returns:
         JSON string containing language names and codes
     """
-    try:
+    try: 
         google_news = GNews()
         return json.dumps({
             "status": "success",
@@ -257,10 +257,10 @@ async def root_handler(request):
     """Root endpoint to show server info"""
     return JSONResponse({
         "name": "GNews MCP Server",
-        "version": "1.0.0",
+        "version":  "1.0.0",
         "status": "running",
         "mcp_endpoint": "/mcp",
-        "description": "Model Context Protocol server for Google News",
+        "description":  "Model Context Protocol server for Google News",
         "tools": [
             "search_news",
             "get_top_news", 
@@ -274,30 +274,33 @@ async def root_handler(request):
 
 # Create lifespan context to manage MCP session manager
 @contextlib.asynccontextmanager
-async def lifespan(app: Starlette):
+async def lifespan(app:  Starlette):
     async with mcp.session_manager.run():
         yield
 
 # Configure MCP to handle /mcp path
 mcp.settings.streamable_http_path = "/mcp"
 
-# Create Starlette app - mount MCP at root so it can handle /mcp directly
-app = Starlette(
-    routes=[
-        Route("/", root_handler),
-        Mount("", app=mcp.streamable_http_app()),
-    ],
-    lifespan=lifespan
-)
+# Get the MCP app
+mcp_app = mcp.streamable_http_app()
 
-# Add CORS middleware to allow all origins
-app = CORSMiddleware(
-    app,
+# Add CORS middleware to MCP app BEFORE creating Starlette app
+mcp_app_with_cors = CORSMiddleware(
+    mcp_app,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Mcp-Session-Id"],
+    expose_headers=["Mcp-Session-Id", "mcp-session-id"],  # Added lowercase version
+)
+
+# Create Starlette app - mount CORS-wrapped MCP app
+app = Starlette(
+    routes=[
+        Route("/", root_handler),
+        Mount("", app=mcp_app_with_cors),
+    ],
+    lifespan=lifespan
 )
 
 # Main entry point
