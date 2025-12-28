@@ -19,9 +19,7 @@ security_settings = TransportSecuritySettings(
     allowed_hosts=[
         "localhost:8000",
         "127.0.0.1:8000",
-        "*.herokuapp.com",  # Allow all Heroku apps
-        "gnews-mcp-e199d066090f.herokuapp.com",
-        "gnews-mcp-e199d066090f.herokuapp.com:*",
+        "*.herokuapp.com",
     ]
 )
 
