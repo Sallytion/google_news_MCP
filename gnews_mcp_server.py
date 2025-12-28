@@ -1,328 +1,308 @@
-#!/usr/bin/env python3
 """
-Google News MCP Server with Streamable HTTP Transport
-Provides Google News search and trending topics via MCP protocol
+GNews MCP Server
+Provides Google News search capabilities via Model Context Protocol
 """
 
-import os
-import asyncio
 import json
+import os
 import logging
+import contextlib
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from contextlib import asynccontextmanager
 
-# Core dependencies
-from fastmcp import FastMCP
-from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-
-# Google News scraper
+from mcp.server.fastmcp import FastMCP
 from gnews import GNews
 
-# Initialize logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route, Mount
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.requests import Request
+
+
+# -------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastMCP server
-mcp = FastMCP("Google News MCP Server")
 
-# Global GNews instance
-gnews_client: Optional[GNews] = None
+# -------------------------------------------------------------------
+# MCP Server Initialization
+# -------------------------------------------------------------------
 
-@asynccontextmanager
-async def lifespan(app):
-    """Application lifespan manager"""
-    global gnews_client
-    
-    # Startup
-    logger.info("Starting Google News MCP Server...")
+mcp = FastMCP(
+    name="GNews Server",
+    instructions=(
+        "A server that provides Google News search capabilities including "
+        "keyword search, top news, topic-based news, location-based news, "
+        "and site-specific news."
+    ),
+    stateless_http=True,
+)
+
+
+# -------------------------------------------------------------------
+# MCP Tools
+# -------------------------------------------------------------------
+
+@mcp.tool()
+def search_news(
+    keyword: str,
+    language: str = "en",
+    country: str = "US",
+    period: str = "7d",
+    max_results: int = 10,
+    exclude_websites: str = "",
+) -> str:
+    """Search for news articles by keyword."""
     try:
-        gnews_client = GNews(
-            language='en',
-            country='US',
-            period='7d',
-            max_results=10
+        logger.info("%s - Searching news for keyword: %s", datetime.now(), keyword)
+
+        exclude_list = [
+            site.strip()
+            for site in exclude_websites.split(",")
+            if site.strip()
+        ]
+
+        google_news = GNews(
+            language=language,
+            country=country,
+            period=period,
+            max_results=max_results,
+            exclude_websites=exclude_list,
         )
-        logger.info("GNews client initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize GNews client: {e}")
-        raise
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down Google News MCP Server...")
-    gnews_client = None
 
-# Tool: Search Google News
+        news = google_news.get_news(keyword)
+        return json.dumps(
+            {"status": "success", "keyword": keyword, "results": news},
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error("Error searching news: %s", str(e))
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
 @mcp.tool()
-async def search_news(
-    query: str,
-    max_results: int = 10,
-    period: str = "7d",
+def get_top_news(
+    language: str = "en",
     country: str = "US",
-    language: str = "en"
-) -> Dict[str, Any]:
-    """
-    Search Google News for articles matching a query.
-    
-    Args:
-        query: Search query string
-        max_results: Maximum number of results to return (default: 10)
-        period: Time period for search (e.g., '1d', '7d', '1m')
-        country: Country code for news (default: 'US')
-        language: Language code (default: 'en')
-    
-    Returns:
-        Dictionary containing search results and metadata
-    """
-    global gnews_client
-    
-    try:
-        # Update client settings
-        gnews_client.period = period
-        gnews_client.max_results = max_results
-        gnews_client.country = country
-        gnews_client.language = language
-        
-        # Perform search
-        logger.info(f"Searching news for query: {query}")
-        results = gnews_client.get_news(query)
-        
-        # Format results
-        formatted_results = []
-        for article in results:
-            formatted_results.append({
-                "title": article.get("title", ""),
-                "description": article.get("description", ""),
-                "url": article.get("url", ""),
-                "publisher": article.get("publisher", {}).get("title", ""),
-                "published_date": article.get("published date", ""),
-            })
-        
-        return {
-            "success": True,
-            "query": query,
-            "count": len(formatted_results),
-            "articles": formatted_results,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error searching news: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "query": query,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-# Tool: Get Trending News
-@mcp.tool()
-async def get_trending(
     max_results: int = 10,
-    country: str = "US",
-    language: str = "en"
-) -> Dict[str, Any]:
-    """
-    Get trending news articles from Google News.
-    
-    Args:
-        max_results: Maximum number of results to return (default: 10)
-        country: Country code for news (default: 'US')
-        language: Language code (default: 'en')
-    
-    Returns:
-        Dictionary containing trending articles and metadata
-    """
-    global gnews_client
-    
+) -> str:
+    """Get top news headlines."""
     try:
-        # Update client settings
-        gnews_client.max_results = max_results
-        gnews_client.country = country
-        gnews_client.language = language
-        
-        # Get trending news
-        logger.info("Fetching trending news")
-        results = gnews_client.get_top_news()
-        
-        # Format results
-        formatted_results = []
-        for article in results:
-            formatted_results.append({
-                "title": article.get("title", ""),
-                "description": article.get("description", ""),
-                "url": article.get("url", ""),
-                "publisher": article.get("publisher", {}).get("title", ""),
-                "published_date": article.get("published date", ""),
-            })
-        
-        return {
-            "success": True,
-            "count": len(formatted_results),
-            "articles": formatted_results,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching trending news: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        logger.info("%s - Fetching top news", datetime.now())
 
-# Tool: Get News by Topic
+        google_news = GNews(
+            language=language,
+            country=country,
+            max_results=max_results,
+        )
+
+        news = google_news.get_top_news()
+        return json.dumps(
+            {"status": "success", "type": "top_news", "results": news},
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error("Error getting top news: %s", str(e))
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
 @mcp.tool()
-async def get_news_by_topic(
+def get_news_by_topic(
     topic: str,
-    max_results: int = 10,
+    language: str = "en",
     country: str = "US",
-    language: str = "en"
-) -> Dict[str, Any]:
-    """
-    Get news articles for a specific topic.
-    
-    Args:
-        topic: Topic to search for (e.g., 'WORLD', 'NATION', 'BUSINESS', 'TECHNOLOGY', 'ENTERTAINMENT', 'SPORTS', 'SCIENCE', 'HEALTH')
-        max_results: Maximum number of results to return (default: 10)
-        country: Country code for news (default: 'US')
-        language: Language code (default: 'en')
-    
-    Returns:
-        Dictionary containing topic articles and metadata
-    """
-    global gnews_client
-    
-    try:
-        # Update client settings
-        gnews_client.max_results = max_results
-        gnews_client.country = country
-        gnews_client.language = language
-        
-        # Get topic news
-        logger.info(f"Fetching news for topic: {topic}")
-        results = gnews_client.get_news_by_topic(topic)
-        
-        # Format results
-        formatted_results = []
-        for article in results:
-            formatted_results.append({
-                "title": article.get("title", ""),
-                "description": article.get("description", ""),
-                "url": article.get("url", ""),
-                "publisher": article.get("publisher", {}).get("title", ""),
-                "published_date": article.get("published date", ""),
-            })
-        
-        return {
-            "success": True,
-            "topic": topic,
-            "count": len(formatted_results),
-            "articles": formatted_results,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching topic news: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "topic": topic,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-# Tool: Get News by Location
-@mcp.tool()
-async def get_news_by_location(
-    location: str,
     max_results: int = 10,
-    period: str = "7d",
-    language: str = "en"
-) -> Dict[str, Any]:
-    """
-    Get news articles for a specific location.
-    
-    Args:
-        location: Location to search for (city, country, region)
-        max_results: Maximum number of results to return (default: 10)
-        period: Time period for search (e.g., '1d', '7d', '1m')
-        language: Language code (default: 'en')
-    
-    Returns:
-        Dictionary containing location-based articles and metadata
-    """
-    global gnews_client
-    
-    try:
-        # Update client settings
-        gnews_client.period = period
-        gnews_client.max_results = max_results
-        gnews_client.language = language
-        
-        # Get location news
-        logger.info(f"Fetching news for location: {location}")
-        results = gnews_client.get_news_by_location(location)
-        
-        # Format results
-        formatted_results = []
-        for article in results:
-            formatted_results.append({
-                "title": article.get("title", ""),
-                "description": article.get("description", ""),
-                "url": article.get("url", ""),
-                "publisher": article.get("publisher", {}).get("title", ""),
-                "published_date": article.get("published date", ""),
-            })
-        
-        return {
-            "success": True,
-            "location": location,
-            "count": len(formatted_results),
-            "articles": formatted_results,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching location news: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "location": location,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-# Resource: Server Info
-@mcp.resource("info://server")
-async def get_server_info() -> str:
-    """Get information about the Google News MCP Server"""
-    info = {
-        "name": "Google News MCP Server",
-        "version": "1.0.0",
-        "description": "MCP server providing Google News search and trending topics",
-        "capabilities": [
-            "search_news",
-            "get_trending",
-            "get_news_by_topic",
-            "get_news_by_location"
-        ],
-        "status": "operational" if gnews_client else "initializing",
-        "timestamp": datetime.utcnow().isoformat()
+) -> str:
+    """Get news by topic category."""
+    valid_topics = {
+        "WORLD",
+        "NATION",
+        "BUSINESS",
+        "TECHNOLOGY",
+        "ENTERTAINMENT",
+        "SPORTS",
+        "SCIENCE",
+        "HEALTH",
+        "POLITICS",
+        "CELEBRITIES",
     }
-    return json.dumps(info, indent=2)
 
-# Configure MCP settings
+    topic_upper = topic.upper()
+    if topic_upper not in valid_topics:
+        return json.dumps(
+            {
+                "status": "error",
+                "message": f"Invalid topic. Valid topics: {', '.join(sorted(valid_topics))}",
+            },
+            indent=2,
+        )
+
+    try:
+        logger.info("%s - Fetching news by topic: %s", datetime.now(), topic_upper)
+
+        google_news = GNews(
+            language=language,
+            country=country,
+            max_results=max_results,
+        )
+
+        news = google_news.get_news_by_topic(topic_upper)
+        return json.dumps(
+            {"status": "success", "topic": topic_upper, "results": news},
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error("Error getting news by topic: %s", str(e))
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@mcp.tool()
+def get_news_by_location(
+    location: str,
+    language: str = "en",
+    country: str = "US",
+    max_results: int = 10,
+) -> str:
+    """Get news by location."""
+    try:
+        logger.info("%s - Fetching news for location: %s", datetime.now(), location)
+
+        google_news = GNews(
+            language=language,
+            country=country,
+            max_results=max_results,
+        )
+
+        news = google_news.get_news_by_location(location)
+        return json.dumps(
+            {"status": "success", "location": location, "results": news},
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error("Error getting news by location: %s", str(e))
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@mcp.tool()
+def get_news_by_site(
+    site: str,
+    language: str = "en",
+    country: str = "US",
+    max_results: int = 10,
+) -> str:
+    """Get news from a specific website."""
+    try:
+        logger.info("%s - Fetching news from site: %s", datetime.now(), site)
+
+        google_news = GNews(
+            language=language,
+            country=country,
+            max_results=max_results,
+        )
+
+        news = google_news.get_news_by_site(site)
+        return json.dumps(
+            {"status": "success", "site": site, "results": news},
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error("Error getting news by site: %s", str(e))
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@mcp.tool()
+def get_available_countries() -> str:
+    """Get supported countries."""
+    try:
+        google_news = GNews()
+        return json.dumps(
+            {"status": "success", "countries": google_news.AVAILABLE_COUNTRIES},
+            indent=2,
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@mcp.tool()
+def get_available_languages() -> str:
+    """Get supported languages."""
+    try:
+        google_news = GNews()
+        return json.dumps(
+            {"status": "success", "languages": google_news.AVAILABLE_LANGUAGES},
+            indent=2,
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+# -------------------------------------------------------------------
+# MCP Resources
+# -------------------------------------------------------------------
+
+@mcp.resource("gnews://config")
+def get_config() -> str:
+    """Server configuration."""
+    return json.dumps(
+        {
+            "server": "GNews MCP Server",
+            "version": "1.0.0",
+            "capabilities": [
+                "search_news",
+                "get_top_news",
+                "get_news_by_topic",
+                "get_news_by_location",
+                "get_news_by_site",
+                "get_available_countries",
+                "get_available_languages",
+            ],
+        },
+        indent=2,
+    )
+
+
+# -------------------------------------------------------------------
+# Starlette App
+# -------------------------------------------------------------------
+
+async def root_handler(request: Request):
+    return JSONResponse(
+        {
+            "name": "GNews MCP Server",
+            "version": "1.0.0",
+            "status": "running",
+            "mcp_endpoint": "/mcp",
+        }
+    )
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: Starlette):
+    async with mcp.session_manager.run():
+        logger.info("MCP session manager started")
+        yield
+        logger.info("MCP session manager stopped")
+
+
 mcp.settings.streamable_http_path = "/mcp"
 
-# Create ASGI application
-app = mcp.get_asgi_app(lifespan=lifespan)
+app = Starlette(
+    routes=[
+        Route("/", root_handler),
+        Mount("/", app=mcp.streamable_http_app()),
+    ],
+    lifespan=lifespan,
+)
 
-# Add CORS middleware
 app = CORSMiddleware(
     app,
     allow_origins=["*"],
@@ -335,23 +315,16 @@ app = CORSMiddleware(
 # Add TrustedHost middleware to fix "Invalid Host header" error
 app = TrustedHostMiddleware(app, allowed_hosts=["*"])
 
-# Run server
-def run_server():
-    """Run the MCP server"""
-    import uvicorn
-    
-    port = int(os.environ.get("PORT", 8000))
-    host = os.environ.get("HOST", "0.0.0.0")
-    
-    logger.info(f"Starting server on {host}:{port}")
-    logger.info(f"MCP endpoint available at http://{host}:{port}/mcp")
-    
-    uvicorn.run(
-        app,
-        host=host,
-        port=port,
-        log_level="info"
-    )
+
+# -------------------------------------------------------------------
+# Entrypoint
+# -------------------------------------------------------------------
 
 if __name__ == "__main__":
-    run_server()
+    import uvicorn
+
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+
+    logger.info("Starting GNews MCP Server on %s:%s", host, port)
+    uvicorn.run("gnews_mcp_server:app", host=host, port=port, log_level="info")
