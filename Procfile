@@ -1,1 +1,1 @@
-web: uvicorn gnews_mcp_server: app --host 0.0.0.0 --port $PORT --workers 1
+web: uvicorn gnews_mcp_server:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
