@@ -15,7 +15,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 # Configure security settings to allow Heroku hostname
 security_settings = TransportSecuritySettings(
-    enable_dns_rebinding_protection=True,
+    enable_dns_rebinding_protection=False,
     allowed_hosts=[
         "localhost:8000",
         "127.0.0.1:8000",
