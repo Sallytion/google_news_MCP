@@ -1,51 +1,37 @@
 """GNews MCP Server - Provides Google News search capabilities via Model Context Protocol"""
 
-from mcp. server. fastmcp import FastMCP
-from mcp. server. transport_security import TransportSecuritySettings
+from mcp.server. fastmcp import FastMCP
 from gnews import GNews
 import json
 import os
 import logging
 from datetime import datetime
 from starlette.applications import Starlette
-from starlette. responses import JSONResponse
+from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
-from starlette. middleware.cors import CORSMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 import contextlib
 
 # Set up logging
-logging.basicConfig(level=logging. INFO)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure security settings to allow Heroku hostname
-# This is CRITICAL for remote deployment
-security_settings = TransportSecuritySettings(
-    enable_dns_rebinding_protection=False,
-    allowed_hosts=[
-        "localhost",
-        "127.0.0.1",
-        "0.0.0.0",
-        "gnews-mcp-e199d066090f.herokuapp.com",
-        "*. herokuapp.com",
-    ]
-)
-
-# Initialize FastMCP server with transport security
+# Initialize FastMCP server with stateless_http=True for serverless/multi-worker environments
 mcp = FastMCP(
     "GNews Server",
     instructions="A server that provides Google News search capabilities including keyword search, top news, news by topic, location, and site.",
-    transport_security=security_settings,
+    stateless_http=True,  # Critical for Heroku multi-worker deployment
 )
 
 
 @mcp.tool()
 def search_news(
-    keyword:  str,
+    keyword: str,
     language: str = "en",
     country: str = "US",
-    period:  str = "7d",
-    max_results: int = 10,
+    period: str = "7d",
+    max_results:  int = 10,
     exclude_websites: str = "",
 ) -> str:
     """
@@ -53,16 +39,16 @@ def search_news(
     
     Args:
         keyword: Search keyword for news
-        language: Language code (e.g., 'en', 'es', 'fr')
+        language: Language code (e. g., 'en', 'es', 'fr')
         country: Country code (e.g., 'US', 'GB', 'IN')
-        period: Time period (e. g., '7d', '12h', '1m', '1y')
-        max_results: Maximum number of results (1-100)
-        exclude_websites: Comma-separated list of websites to exclude (e.g., 'yahoo. com,cnn.com')
+        period: Time period (e.g., '7d', '12h', '1m', '1y')
+        max_results:  Maximum number of results (1-100)
+        exclude_websites:  Comma-separated list of websites to exclude (e.g., 'yahoo.com,cnn.com')
     
     Returns:
         JSON string containing news articles
     """
-    try:
+    try: 
         logger.info(f"{datetime.now()} - Searching news for keyword: {keyword}")
         exclude_list = [x.strip() for x in exclude_websites.split(",") if x.strip()] if exclude_websites else []
         
@@ -75,7 +61,7 @@ def search_news(
         )
         
         news = google_news.get_news(keyword)
-        return json. dumps({"status": "success", "keyword": keyword, "results":  news}, indent=2)
+        return json.dumps({"status": "success", "keyword": keyword, "results": news}, indent=2)
     except Exception as e:
         logger.error(f"Error searching news: {str(e)}")
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
@@ -98,7 +84,7 @@ def get_top_news(
     Returns:
         JSON string containing top news articles
     """
-    try:
+    try: 
         logger.info(f"{datetime.now()} - Getting top news")
         google_news = GNews(
             language=language,
@@ -132,16 +118,16 @@ def get_news_by_topic(
     Returns:
         JSON string containing news articles for the topic
     """
-    try: 
+    try:
         logger.info(f"{datetime.now()} - Getting news by topic: {topic}")
         valid_topics = ["WORLD", "NATION", "BUSINESS", "TECHNOLOGY", "ENTERTAINMENT", 
                        "SPORTS", "SCIENCE", "HEALTH", "POLITICS", "CELEBRITIES"]
         
         topic_upper = topic.upper()
-        if topic_upper not in valid_topics: 
-            return json. dumps({
+        if topic_upper not in valid_topics:
+            return json.dumps({
                 "status": "error", 
-                "message":  f"Invalid topic.  Valid topics are: {', '.join(valid_topics)}"
+                "message": f"Invalid topic. Valid topics are: {', '.join(valid_topics)}"
             }, indent=2)
         
         google_news = GNews(
@@ -159,13 +145,13 @@ def get_news_by_topic(
 
 @mcp.tool()
 def get_news_by_location(
-    location: str,
+    location:  str,
     language: str = "en",
     country: str = "US",
     max_results: int = 10,
 ) -> str:
     """
-    Get news by location/city/region. 
+    Get news by location/city/region.
     
     Args:
         location: Location name (city, state, or region)
@@ -176,7 +162,7 @@ def get_news_by_location(
     Returns:
         JSON string containing news articles for the location
     """
-    try: 
+    try:
         logger.info(f"{datetime.now()} - Getting news by location: {location}")
         google_news = GNews(
             language=language,
@@ -185,32 +171,32 @@ def get_news_by_location(
         )
         
         news = google_news.get_news_by_location(location)
-        return json. dumps({"status": "success", "location": location, "results":  news}, indent=2)
-    except Exception as e:
+        return json.dumps({"status": "success", "location": location, "results": news}, indent=2)
+    except Exception as e: 
         logger.error(f"Error getting news by location: {str(e)}")
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return json. dumps({"status": "error", "message": str(e)}, indent=2)
 
 
 @mcp.tool()
 def get_news_by_site(
     site: str,
     language: str = "en",
-    country: str = "US",
+    country:  str = "US",
     max_results: int = 10,
 ) -> str:
     """
     Get news from a specific website/source.
     
     Args:
-        site: Website domain (e. g., 'cnn. com', 'bbc.com', 'reuters.com')
-        language: Language code (e. g., 'en', 'es', 'fr')
+        site:  Website domain (e.g., 'cnn.com', 'bbc.com', 'reuters.com')
+        language: Language code (e.g., 'en', 'es', 'fr')
         country: Country code (e.g., 'US', 'GB', 'IN')
         max_results: Maximum number of results (1-100)
     
     Returns:
         JSON string containing news articles from the site
     """
-    try:
+    try: 
         logger.info(f"{datetime.now()} - Getting news by site: {site}")
         google_news = GNews(
             language=language,
@@ -219,7 +205,7 @@ def get_news_by_site(
         )
         
         news = google_news.get_news_by_site(site)
-        return json.dumps({"status": "success", "site": site, "results": news}, indent=2)
+        return json. dumps({"status": "success", "site": site, "results":  news}, indent=2)
     except Exception as e:
         logger.error(f"Error getting news by site: {str(e)}")
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
@@ -235,12 +221,12 @@ def get_available_countries() -> str:
     """
     try:
         google_news = GNews()
-        return json. dumps({
+        return json.dumps({
             "status": "success",
-            "countries": google_news.AVAILABLE_COUNTRIES
+            "countries": google_news. AVAILABLE_COUNTRIES
         }, indent=2)
     except Exception as e:
-        return json.dumps({"status":  "error", "message": str(e)}, indent=2)
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
 
 
 @mcp.tool()
@@ -253,12 +239,12 @@ def get_available_languages() -> str:
     """
     try:
         google_news = GNews()
-        return json.dumps({
-            "status":  "success",
-            "languages":  google_news.AVAILABLE_LANGUAGES
+        return json. dumps({
+            "status": "success",
+            "languages": google_news.AVAILABLE_LANGUAGES
         }, indent=2)
-    except Exception as e: 
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+    except Exception as e:
+        return json.dumps({"status":  "error", "message": str(e)}, indent=2)
 
 
 # Resource to expose configuration info
@@ -267,8 +253,8 @@ def get_config() -> str:
     """Get GNews MCP server configuration information."""
     return json.dumps({
         "server":  "GNews MCP Server",
-        "version": "1.0.0",
-        "capabilities":  [
+        "version":  "1.0.0",
+        "capabilities": [
             "search_news",
             "get_top_news",
             "get_news_by_topic",
@@ -290,7 +276,7 @@ async def root_handler(request: Request):
         "name": "GNews MCP Server",
         "version": "1.0.0",
         "status": "running",
-        "mcp_endpoint":  "/mcp",
+        "mcp_endpoint": "/mcp",
         "description": "Model Context Protocol server for Google News",
         "tools": [
             "search_news",
@@ -308,7 +294,7 @@ async def root_handler(request: Request):
 @contextlib.asynccontextmanager
 async def lifespan(app: Starlette):
     """Manage the MCP session manager lifecycle."""
-    async with mcp.session_manager. run():
+    async with mcp.session_manager.run():
         logger.info(f"{datetime.now()} - StreamableHTTP session manager started")
         logger.info("MCP session manager started")
         yield
@@ -322,7 +308,7 @@ mcp.settings.streamable_http_path = "/mcp"
 app = Starlette(
     routes=[
         Route("/", root_handler),
-        Mount("/", app=mcp.streamable_http_app()),
+        Mount("/", app=mcp. streamable_http_app()),
     ],
     lifespan=lifespan,
 )
@@ -339,10 +325,10 @@ app = CORSMiddleware(
 
 
 # Main entry point
-if __name__ == "__main__": 
+if __name__ == "__main__":
     import uvicorn
     
-    port = int(os. environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
     
     logger.info(f"Starting GNews MCP Server on {host}:{port}")
